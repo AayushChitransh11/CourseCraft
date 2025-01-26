@@ -3,6 +3,7 @@ const { Router }=require("express");
 const adminRouter=Router();
 
 const {adminModel}=require("./db");
+const {courseModel}=require("./db")
 const jwt=require('jsonwebtoken');
 const { JWT_ADMIN_PASSWORD }=require("../config");
 const { adminMiddleware }=require("../middleware/admin");
@@ -28,28 +29,34 @@ adminRouter.post("/signup",async function(req,res){
     })
 })
 
-adminRouter.post("/signin",async function(req,res){
-    const { email, password}=req.body;
-    
-    const admin=await adminModel.findOne({
-        email:email,
-        password:password
-    });
+adminRouter.post("/signin", async function (req, res) {
+    const { email, password } = req.body;
 
-    if(admin){
-        const token=jwt.sign({
-            id: admin._id
-        },JWT_ADMIN_PASSWORD);
-        
-        res.json({
-            token:token
-        })
-    }else{
-    res.status(403).json({
-        message:"Invalid credentials!"
-    })
+    try {
+        const admin = await adminModel.findOne({
+            email: email,
+            password: password,
+        });
+
+        if (admin) {
+            const token = jwt.sign(
+                { id: admin._id },
+                JWT_ADMIN_PASSWORD
+            );
+
+            // Send the token as a response and exit
+            return res.json({ token });
+        } else {
+            // Ensure this response exits the function
+            return res.status(403).json({ message: "Invalid credentials!" });
+        }
+    } catch (err) {
+        // Catch unexpected errors and send a server error response
+        console.error(err);
+        return res.status(500).json({ message: "Internal server error" });
     }
-})
+});
+
 
 adminRouter.post("/course",adminMiddleware, async function(req,res){
     const adminId= req.userId;
@@ -71,14 +78,40 @@ adminRouter.post("/course",adminMiddleware, async function(req,res){
     })
 })
 
-adminRouter.put("/course",function(req,res){
+adminRouter.put("/course",adminMiddleware,async function(req,res){
+    const adminId= req.userId;
+
+    const {title, desciption, imageUrl, price, courseId}=req.body;
+
+
+    const course=await courseModel.updateOne({
+        _id: courseId,
+        creatorId: adminId
+    },{
+        title: title,
+        desciption:desciption,
+        imageUrl:imageUrl,
+        price:price,
+    })
+
     res.json({
-        message:"Admin signin"
+        message:"Course Updated!",
+        courseId: course._id
     })
 })
-adminRouter.get("/course/bulk",function(req,res){
+adminRouter.get("/course/bulk",adminMiddleware, async function(req,res){
+    const adminId= req.userId;
+
+    const {title, desciption, imageUrl, price, courseId}=req.body;
+
+
+    const courses=await courseModel.find({
+        creatorId: adminId
+    });
+
     res.json({
-        message:"Admin signin"
+        message:"All Courses",
+       courses
     })
 })
 
